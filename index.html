@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eliminação de Plantas por Raio — Sococo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  :root {
+    /* Paleta central do dashboard: alterar aqui muda as cores em toda a tela. */
+    --bg:      #111111;
+    --surface: #1a1a1a;
+    --card:    #222222;
+    --border:  #333333;
+    --red:     #e02020;
+    --red-dim: rgba(224,32,32,0.15);
+    --red-soft:#c01818;
+    --white:   #ffffff;
+    --off:     #f2f2f2;
+    --muted:   #c7c7c7;
+    --gray:    #b5b5b5;
+    --gray2:   #8f8f8f;
+    --gold:    #c8a84b;
+    --gold-dim:rgba(200,168,75,0.15);
+    --success: #75d67c;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--off);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+
+  /* HEADER */
+  header {
+    background: #000;
+    border-bottom: 2px solid var(--red);
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo { display: flex; align-items: center; gap: 14px; }
+  .logo-icon {
+    width: 48px; height: 48px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .logo-icon svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .logo-text { font-size: 15px; font-weight: 700; color: var(--white); letter-spacing: 0.02em; }
+  .logo-sub  { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .header-right { font-size: 11px; color: var(--muted); text-align: right; line-height: 1.6; }
+
+  /* MAIN */
+  main { padding: 24px 32px; max-width: 1400px; margin: 0 auto; }
+
+  /* FILTROS */
+  .filtros {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 22px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: flex-end;
+    margin-bottom: 24px;
+  }
+  .filtro-group { display: flex; flex-direction: column; gap: 5px; }
+  .filtro-group label {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .filtro-group select, .filtro-group input[type=number] {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--off);
+    border-radius: 6px;
+    padding: 7px 11px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .filtro-group select:focus, .filtro-group input:focus { outline: none; border-color: var(--red); }
+  .btn {
+    padding: 8px 18px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    transition: all 0.15s;
+  }
+  .btn-red     { background: var(--red); color: #fff; }
+  .btn-red:hover { background: var(--red-soft); transform: translateY(-1px); }
+  .btn-outline { background: transparent; color: var(--off); border: 1px solid var(--border); }
+  .btn-outline:hover { border-color: var(--gray); background: var(--surface); }
+  .btn-white   { background: var(--white); color: #111; }
+  .btn-white:hover { background: #ddd; }
+  .btn-gold    { background: var(--gold); color: #111; }
+  .btn-gold:hover { background: #b5943a; }
+  .filter-actions {
+    display: flex;
+    gap: 10px;
+    margin-left: auto;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: flex-end;
+  }
+  .btn-import {
+    background: rgba(200,168,75,0.16);
+    color: #f0d782;
+    border: 1px solid rgba(200,168,75,0.5);
+  }
+  .btn-import:hover { background: rgba(200,168,75,0.25); border-color: var(--gold); }
+
+  /* KPI CARDS */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .kpi-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.15s, border-color 0.15s;
+  }
+  .kpi-card:hover { transform: translateY(-2px); border-color: var(--gray2); }
+  .kpi-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px; height: 100%;
+    border-radius: 10px 0 0 10px;
+  }
+  .kpi-card.c-red::after   { background: var(--red); }
+  .kpi-card.c-white::after { background: var(--white); }
+  .kpi-card.c-gold::after  { background: var(--gold); }
+  .kpi-card.c-gray::after  { background: var(--gray); }
+  .kpi-label  { font-size: 10px; color: var(--muted); letter-spacing: 0.07em; text-transform: uppercase; font-weight: 600; margin-bottom: 8px; }
+  .kpi-value  { font-size: 28px; font-weight: 700; line-height: 1; color: var(--white); }
+  .kpi-sub    { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+  /* CHARTS */
+  .charts-grid   { display: grid; grid-template-columns: 2fr 1fr; gap: 18px; margin-bottom: 18px; }
+  .charts-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+  .chart-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .chart-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  canvas { max-width: 100%; }
+
+  /* TABELA */
+  .table-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 20px;
+    overflow-x: auto;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead tr { border-bottom: 2px solid var(--red); }
+  th {
+    padding: 9px 13px;
+    text-align: left;
+    font-size: 10px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  tbody tr:hover { background: rgba(255,255,255,0.03); }
+  td { padding: 8px 13px; }
+  tbody td { color: var(--off); }
+  tbody td:first-child { color: var(--gray2); }
+  .badge {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+  .badge-high { background: var(--red-dim);  color: #ff6666; }
+  .badge-mid  { background: var(--gold-dim); color: var(--gold); }
+  .badge-low  { background: rgba(255,255,255,0.08); color: var(--off); }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--red);
+    border-radius: 10px;
+    padding: 26px 30px;
+    width: 400px;
+    max-width: 95vw;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal h2 { font-size: 15px; font-weight: 700; margin-bottom: 20px; color: var(--white); }
+  .modal-field { margin-bottom: 14px; }
+  .modal-field label {
+    display: block;
+    font-size: 10px;
+    color: var(--gray);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .modal-field select, .modal-field input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--off);
+    border-radius: 6px;
+    padding: 8px 11px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+  }
+  .modal-field select:focus, .modal-field input:focus { outline: none; border-color: var(--red); }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    padding: 11px 20px;
+    border-radius: 7px;
+    font-weight: 600;
+    font-size: 13px;
+    z-index: 300;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.25s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  @media (max-width: 900px) {
+    main { padding: 14px; }
+    header { padding: 12px 16px; }
+    .charts-grid, .charts-grid-2 { grid-template-columns: 1fr; }
+    .filter-actions { width: 100%; margin-left: 0; justify-content: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon" aria-label="Logo Sococo">
+      <svg viewBox="0 0 120 120" role="img" aria-labelledby="logo-title">
+        <title id="logo-title">Sococo</title>
+        <path fill="#f51f2d" d="M91.7 22.3c-8.4-9.9-25.8-12.1-39.8-7.3-17.4 6-26.6 20.2-22.1 33.2 4 11.6 16.4 16.5 29.1 20.9 9.6 3.3 18.1 6.3 19.6 13.5 1.8 8.7-7.6 14.6-18.3 14.3-9-.3-16-4.6-17.8-10.2 4.3 2.7 11.5 2.1 14.4-2.5 2.9-4.7-.3-10.7-7.5-12.2-12.4-2.6-24.4 5-25.2 16.4-.9 13.1 13.2 22.9 32.8 22.9 24.1 0 41.4-13.1 38.7-31.8-2.1-14.6-15.6-20.6-30.4-25.4-11.1-3.6-20.3-6.7-21.2-14.1-1-8.1 6.7-13.5 17.7-13.3 8.8.2 15.1 3.9 17.1 8.7-4.1-2.3-10.5-1.9-13.1 2.1-3.1 4.7 1 10.3 8.1 10.9 12.4 1.1 23.2-6.8 24-17.3.2-3.5-1.1-6.6-4.1-8.8z"/>
+      </svg>
+    </div>
+    <div>
+      <div class="logo-text">SOCOCO S/A — Agroindústrias da Amazônia</div>
+      <div class="logo-sub">Relatório de Eliminação de Plantas por Raio</div>
+    </div>
+  </div>
+  <div class="header-right"><span id="header-periodo">Aguardando importação</span><br>Dashboard Fitossanitário</div>
+</header>
+
+<main>
+
+  <!-- FILTROS -->
+  <div class="filtros">
+    <div class="filtro-group">
+      <label>Ano Inicial</label>
+      <select id="f-ano-ini"></select>
+    </div>
+    <div class="filtro-group">
+      <label>Ano Final</label>
+      <select id="f-ano-fim"></select>
+    </div>
+    <div class="filtro-group">
+      <label>Mês Inicial</label>
+      <select id="f-mes-ini">
+        <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+        <option value="3">Março</option><option value="4">Abril</option>
+        <option value="5">Maio</option><option value="6">Junho</option>
+        <option value="7">Julho</option><option value="8">Agosto</option>
+        <option value="9">Setembro</option><option value="10">Outubro</option>
+        <option value="11">Novembro</option><option value="12">Dezembro</option>
+      </select>
+    </div>
+    <div class="filtro-group">
+      <label>Mês Final</label>
+      <select id="f-mes-fim">
+        <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+        <option value="3">Março</option><option value="4">Abril</option>
+        <option value="5">Maio</option><option value="6">Junho</option>
+        <option value="7">Julho</option><option value="8">Agosto</option>
+        <option value="9">Setembro</option><option value="10">Outubro</option>
+        <option value="11">Novembro</option><option value="12">Dezembro</option>
+      </select>
+    </div>
+    <button class="btn btn-red" onclick="aplicarFiltro()">Filtrar</button>
+    <button class="btn btn-outline" onclick="resetarFiltro()">Resetar</button>
+    <div class="filter-actions">
+      <button class="btn btn-white" onclick="abrirModal()">+ Adicionar</button>
+      <button class="btn btn-import" onclick="abrirImportacao()">Importar Excel</button>
+      <button class="btn btn-outline" onclick="exportarCSV()">⬇ Exportar CSV</button>
+    </div>
+  </div>
+  <input type="file" id="import-excel" accept=".xlsx,.xls,.csv" hidden onchange="importarExcel(event)">
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi-card c-red">
+      <div class="kpi-label">Total Eliminadas</div>
+      <div class="kpi-value" id="kpi-total">—</div>
+      <div class="kpi-sub" id="kpi-periodo">período completo</div>
+    </div>
+    <div class="kpi-card c-white">
+      <div class="kpi-label">Média Mensal</div>
+      <div class="kpi-value" id="kpi-media">—</div>
+      <div class="kpi-sub">plantas / mês</div>
+    </div>
+    <div class="kpi-card c-red">
+      <div class="kpi-label">Pico Máximo</div>
+      <div class="kpi-value" id="kpi-max">—</div>
+      <div class="kpi-sub" id="kpi-max-mes">—</div>
+    </div>
+    <div class="kpi-card c-gray">
+      <div class="kpi-label">Mínimo</div>
+      <div class="kpi-value" id="kpi-min">—</div>
+      <div class="kpi-sub" id="kpi-min-mes">—</div>
+    </div>
+    <div class="kpi-card c-gold">
+      <div class="kpi-label">Meses Registrados</div>
+      <div class="kpi-value" id="kpi-n">—</div>
+      <div class="kpi-sub">no período filtrado</div>
+    </div>
+  </div>
+
+  <!-- GRÁFICOS PRINCIPAIS -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">Série Histórica — Mensal</div>
+      <canvas id="chartLinha" height="180"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Total por Ano</div>
+      <canvas id="chartAnos" height="180"></canvas>
+    </div>
+  </div>
+
+  <!-- GRÁFICOS SECUNDÁRIOS -->
+  <div class="charts-grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Sazonalidade — Média por Mês</div>
+      <canvas id="chartSazonal" height="200"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Distribuição por Nível</div>
+      <canvas id="chartDist" height="200"></canvas>
+    </div>
+  </div>
+
+  <!-- TABELA -->
+  <div class="table-card">
+    <div class="chart-title">Registros Detalhados</div>
+    <table>
+      <thead>
+        <tr><th>#</th><th>Ano</th><th>Mês</th><th>Plantas</th><th>vs. Média</th><th>Nível</th><th>Ações</th></tr>
+      </thead>
+      <tbody id="tbl-body"></tbody>
+    </table>
+  </div>
+
+</main>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <h2 id="modal-title">Adicionar Registro</h2>
+    <div class="modal-field">
+      <label>Ano</label>
+      <input type="number" id="m-ano" min="2020" max="2030" placeholder="Ex: 2026">
+    </div>
+    <div class="modal-field">
+      <label>Mês</label>
+      <select id="m-mes">
+        <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+        <option value="3">Março</option><option value="4">Abril</option>
+        <option value="5">Maio</option><option value="6">Junho</option>
+        <option value="7">Julho</option><option value="8">Agosto</option>
+        <option value="9">Setembro</option><option value="10">Outubro</option>
+        <option value="11">Novembro</option><option value="12">Dezembro</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label>Nº de Plantas Eliminadas</label>
+      <input type="number" id="m-valor" min="0" placeholder="Ex: 120">
+    </div>
+    <input type="hidden" id="m-edit-index" value="-1">
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-red" onclick="salvarRegistro()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// Nomes dos meses usados nos filtros, gráficos, tabela e mensagens.
+const MESES = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const MESES_ABREV = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+// O dashboard começa sem dados. A planilha importada passa a ser a fonte do relatório.
+const STORAGE_KEY = 'dados_raio_importado';
+
+// Estado principal da tela:
+// - dados: registros completos, com alterações salvas no navegador.
+// - filtrado: registros atualmente exibidos depois dos filtros.
+// - charts: instâncias dos gráficos para destruir e recriar quando os dados mudam.
+let dados = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+let filtrado = [...dados];
+let charts = {};
+
+// Monta os selects de ano com base nos anos existentes nos dados.
+function initFiltros() {
+  const anos = [...new Set(dados.map(d=>d.ano))].sort();
+  ['f-ano-ini','f-ano-fim'].forEach((id,i) => {
+    const s = document.getElementById(id);
+    s.innerHTML = '';
+    anos.forEach(a => s.innerHTML += `<option value="${a}">${a}</option>`);
+    s.value = anos.length ? (i===0 ? anos[0] : anos[anos.length-1]) : '';
+  });
+  document.getElementById('f-mes-ini').value = 1;
+  document.getElementById('f-mes-fim').value = 12;
+}
+
+// Lê os filtros escolhidos, valida o período e atualiza a lista exibida.
+function aplicarFiltro() {
+  const ai=+document.getElementById('f-ano-ini').value, af=+document.getElementById('f-ano-fim').value;
+  const mi=+document.getElementById('f-mes-ini').value, mf=+document.getElementById('f-mes-fim').value;
+  if(!ai || !af || ai > af || (ai === af && mi > mf)) {
+    filtrado = [];
+    renderTudo();
+    showToast('Selecione um período válido.','#c8a84b','#111');
+    return;
+  }
+  filtrado = dados.filter(d => {
+    if(d.ano<ai||d.ano>af) return false;
+    if(d.ano===ai&&d.mes<mi) return false;
+    if(d.ano===af&&d.mes>mf) return false;
+    return true;
+  });
+  renderTudo();
+}
+
+// Volta os filtros para o período completo e renderiza tudo novamente.
+function resetarFiltro() { initFiltros(); filtrado=[...dados]; renderTudo(); }
+
+// Atualiza o período mostrado no topo da página conforme os dados carregados.
+function atualizarPeriodoCabecalho() {
+  const headerPeriodo = document.getElementById('header-periodo');
+  if(!dados.length) {
+    headerPeriodo.textContent = 'Aguardando importação';
+    return;
+  }
+  const ordenado = [...dados].sort((a,b)=>a.ano!==b.ano?a.ano-b.ano:a.mes-b.mes);
+  const primeiro = ordenado[0];
+  const ultimo = ordenado[ordenado.length-1];
+  headerPeriodo.textContent = `${MESES_ABREV[primeiro.mes]}/${primeiro.ano} → ${MESES_ABREV[ultimo.mes]}/${ultimo.ano}`;
+}
+
+// Preenche os cards com hífen quando não existe dado no período filtrado.
+function limparKPIs() {
+  ['kpi-total','kpi-media','kpi-max','kpi-min','kpi-n'].forEach(id => {
+    document.getElementById(id).textContent = '—';
+  });
+  document.getElementById('kpi-periodo').textContent = dados.length ? 'sem registros no filtro' : 'importe uma planilha';
+  document.getElementById('kpi-max-mes').textContent = '—';
+  document.getElementById('kpi-min-mes').textContent = '—';
+}
+
+// Remove os gráficos atuais antes de criar novos, evitando sobreposição e vazamento de memória.
+function destruirGraficos() {
+  Object.values(charts).forEach(chart => chart?.destroy());
+  charts = {};
+}
+
+// Calcula e exibe total, média, maior valor, menor valor e quantidade de meses.
+function renderKPIs() {
+  const vals = filtrado.map(d=>d.v);
+  if(!vals.length) { limparKPIs(); return; }
+  const total = vals.reduce((a,b)=>a+b,0);
+  const media = (total/vals.length).toFixed(1);
+  const maxVal = Math.max(...vals), minVal = Math.min(...vals);
+  const maxReg = filtrado.find(d=>d.v===maxVal), minReg = filtrado.find(d=>d.v===minVal);
+  document.getElementById('kpi-total').textContent = total.toLocaleString('pt-BR');
+  document.getElementById('kpi-media').textContent = media.replace('.',',');
+  document.getElementById('kpi-max').textContent = maxVal;
+  document.getElementById('kpi-max-mes').textContent = `${MESES[maxReg.mes]}/${maxReg.ano}`;
+  document.getElementById('kpi-min').textContent = minVal;
+  document.getElementById('kpi-min-mes').textContent = `${MESES[minReg.mes]}/${minReg.ano}`;
+  document.getElementById('kpi-n').textContent = filtrado.length;
+  document.getElementById('kpi-periodo').textContent =
+    `${MESES_ABREV[filtrado[0].mes]}/${filtrado[0].ano} → ${MESES_ABREV[filtrado[filtrado.length-1].mes]}/${filtrado[filtrado.length-1].ano}`;
+}
+
+// Cores usadas nas linhas de grade e textos dos gráficos.
+const GRID_COLOR = 'rgba(255,255,255,0.06)';
+const TICK_COLOR = '#d0d0d0';
+
+// Gráfico de linha com a série mensal e uma linha pontilhada de média.
+function renderLinha() {
+  const labels = filtrado.map(d=>`${MESES_ABREV[d.mes]}/${d.ano}`);
+  const values = filtrado.map(d=>d.v);
+  const media = values.reduce((a,b)=>a+b,0)/values.length;
+  if(charts.linha) charts.linha.destroy();
+  charts.linha = new Chart(document.getElementById('chartLinha'), {
+    type:'line',
+    data:{
+      labels,
+      datasets:[
+        {
+          label:'Plantas Eliminadas',
+          data:values,
+          borderColor:'#e02020',
+          backgroundColor:'rgba(224,32,32,0.07)',
+          borderWidth:2,
+          pointRadius:2.5,
+          pointBackgroundColor:'#e02020',
+          pointHoverRadius:5,
+          fill:true,
+          tension:0.3,
+        },
+        {
+          label:'Média',
+          data:values.map(()=>media),
+          borderColor:'rgba(200,168,75,0.8)',
+          borderWidth:1.5,
+          borderDash:[6,4],
+          pointRadius:0,
+          fill:false,
+        }
+      ]
+    },
+    options:{
+      responsive:true,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:TICK_COLOR,font:{size:11,family:'Inter'}}}},
+      scales:{
+        x:{ticks:{color:TICK_COLOR,maxTicksLimit:16,font:{size:10}},grid:{color:GRID_COLOR}},
+        y:{ticks:{color:TICK_COLOR},grid:{color:GRID_COLOR},beginAtZero:true}
+      }
+    }
+  });
+}
+
+// Gráfico de barras somando as plantas eliminadas por ano.
+function renderAnos() {
+  const anos = {};
+  filtrado.forEach(d=>{ anos[d.ano]=(anos[d.ano]||0)+d.v; });
+  const labels = Object.keys(anos).sort();
+  const values = labels.map(a=>anos[a]);
+  if(charts.anos) charts.anos.destroy();
+  charts.anos = new Chart(document.getElementById('chartAnos'), {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[{
+        label:'Total',
+        data:values,
+        backgroundColor: values.map((v,i)=> i===values.indexOf(Math.max(...values)) ? '#e02020' : 'rgba(255,255,255,0.12)'),
+        borderRadius:5,
+        borderSkipped:false,
+      }]
+    },
+    options:{
+      responsive:true,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:TICK_COLOR},grid:{color:GRID_COLOR}},
+        y:{ticks:{color:TICK_COLOR},grid:{color:GRID_COLOR},beginAtZero:true}
+      }
+    }
+  });
+}
+
+// Gráfico de sazonalidade: média de cada mês considerando o período filtrado.
+function renderSazonal() {
+  const porMes = Array(13).fill(0).map(()=>({sum:0,n:0}));
+  filtrado.forEach(d=>{ porMes[d.mes].sum+=d.v; porMes[d.mes].n++; });
+  const values = porMes.slice(1).map(m=>m.n ? +(m.sum/m.n).toFixed(1) : 0);
+  if(charts.sazonal) charts.sazonal.destroy();
+  charts.sazonal = new Chart(document.getElementById('chartSazonal'), {
+    type:'bar',
+    data:{
+      labels: MESES_ABREV.slice(1),
+      datasets:[{
+        label:'Média',
+        data:values,
+        backgroundColor: values.map(v =>
+          v > 160 ? 'rgba(224,32,32,0.85)' :
+          v > 110 ? 'rgba(200,168,75,0.8)' :
+          'rgba(255,255,255,0.15)'
+        ),
+        borderRadius:4
+      }]
+    },
+    options:{
+      responsive:true,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:TICK_COLOR},grid:{color:GRID_COLOR}},
+        y:{ticks:{color:TICK_COLOR},grid:{color:GRID_COLOR},beginAtZero:true}
+      }
+    }
+  });
+}
+
+// Gráfico de rosca que classifica os meses em baixo, médio e alto.
+function renderDist() {
+  const vals = filtrado.map(d=>d.v);
+  const low  = vals.filter(v=>v<100).length;
+  const mid  = vals.filter(v=>v>=100&&v<180).length;
+  const high = vals.filter(v=>v>=180).length;
+  if(charts.dist) charts.dist.destroy();
+  charts.dist = new Chart(document.getElementById('chartDist'), {
+    type:'doughnut',
+    data:{
+      labels:['Baixo (<100)','Médio (100–179)','Alto (≥180)'],
+      datasets:[{
+        data:[low,mid,high],
+        backgroundColor:['rgba(255,255,255,0.15)','rgba(200,168,75,0.75)','rgba(224,32,32,0.85)'],
+        borderColor:['#222','#222','#222'],
+        borderWidth:3
+      }]
+    },
+    options:{
+      responsive:true,
+      cutout:'62%',
+      plugins:{
+        legend:{labels:{color:TICK_COLOR,font:{size:12,family:'Inter'}}},
+        tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw} meses`}}
+      }
+    }
+  });
+}
+
+// Tabela detalhada dos registros, incluindo comparação percentual contra a média do período.
+function renderTabela() {
+  const body  = document.getElementById('tbl-body');
+  body.innerHTML = '';
+  if(!filtrado.length) {
+    const mensagem = dados.length
+      ? 'Nenhum registro encontrado para o período selecionado.'
+      : 'Importe uma planilha Excel ou CSV para montar o relatório automaticamente.';
+    body.innerHTML = `<tr><td colspan="7" style="color:var(--gray);text-align:center;padding:18px">${mensagem}</td></tr>`;
+    return;
+  }
+  const media = filtrado.reduce((a,b)=>a+b.v,0)/filtrado.length;
+  [...filtrado].reverse().forEach((d,i) => {
+    const diff = d.v - media;
+    const pct  = ((diff/media)*100).toFixed(1);
+    let nivel, badgeClass;
+    if(d.v>=180)      { nivel='Alto';  badgeClass='badge-high'; }
+    else if(d.v>=100) { nivel='Médio'; badgeClass='badge-mid'; }
+    else              { nivel='Baixo'; badgeClass='badge-low'; }
+    const realIdx = dados.findIndex(x=>x.ano===d.ano&&x.mes===d.mes);
+    body.innerHTML += `
+      <tr>
+        <td style="font-size:12px">${filtrado.length-i}</td>
+        <td>${d.ano}</td>
+        <td>${MESES[d.mes]}</td>
+        <td><strong style="color:var(--white)">${d.v}</strong></td>
+        <td style="color:${diff>=0?'#ff6969':'#75d67c'};font-size:12px;font-weight:600">
+          ${diff>=0?'+':''}${pct}%
+        </td>
+        <td><span class="badge ${badgeClass}">${nivel}</span></td>
+        <td>
+          <button class="btn btn-outline" style="padding:3px 10px;font-size:12px" onclick="editarRegistro(${realIdx})">Editar</button>
+          <button class="btn" style="padding:3px 10px;font-size:12px;background:var(--red-dim);color:#ff6666;border:none;border-radius:6px;margin-left:4px;cursor:pointer" onclick="excluirRegistro(${realIdx})">Excluir</button>
+        </td>
+      </tr>`;
+  });
+}
+
+// Renderiza todos os componentes do dashboard na ordem correta.
+function renderTudo() {
+  atualizarPeriodoCabecalho();
+  renderKPIs();
+  if(!filtrado.length) {
+    destruirGraficos();
+    renderTabela();
+    return;
+  }
+  renderLinha(); renderAnos(); renderSazonal(); renderDist(); renderTabela();
+}
+
+// Abre o modal para adicionar ou editar um registro.
+function abrirModal(editIdx=-1) {
+  document.getElementById('m-edit-index').value = editIdx;
+  if(editIdx>=0) {
+    if(!dados[editIdx]) { showToast('Registro não encontrado.','#e02020','#fff'); return; }
+    const d = dados[editIdx];
+    document.getElementById('modal-title').textContent = 'Editar Registro';
+    document.getElementById('m-ano').value   = d.ano;
+    document.getElementById('m-mes').value   = d.mes;
+    document.getElementById('m-valor').value = d.v;
+  } else {
+    document.getElementById('modal-title').textContent = 'Adicionar Registro';
+    document.getElementById('m-ano').value   = '';
+    document.getElementById('m-valor').value = '';
+    document.getElementById('m-mes').value   = 1;
+  }
+  document.getElementById('modal-overlay').classList.add('open');
+}
+// Fecha o modal sem salvar alterações.
+function fecharModal() { document.getElementById('modal-overlay').classList.remove('open'); }
+
+// Valida os campos do modal, salva no estado principal e persiste no localStorage.
+function salvarRegistro() {
+  const anoInput = document.getElementById('m-ano').value.trim();
+  const valorInput = document.getElementById('m-valor').value.trim();
+  const ano = Number(anoInput);
+  const mes = Number(document.getElementById('m-mes').value);
+  const v   = Number(valorInput);
+  if(!anoInput||!valorInput||!Number.isInteger(ano)||ano<1900||ano>2100||!Number.isInteger(mes)||mes<1||mes>12||!Number.isInteger(v)||v<0) {
+    showToast('Preencha todos os campos corretamente.','#e02020','#fff');
+    return;
+  }
+  const editIdx = +document.getElementById('m-edit-index').value;
+  const duplicado = dados.some((d,idx)=>idx!==editIdx&&d.ano===ano&&d.mes===mes);
+  if(duplicado) { showToast('Mês/ano já cadastrado.','#c8a84b','#111'); return; }
+  if(editIdx>=0) {
+    dados[editIdx]={ano,mes,v};
+    dados.sort((a,b)=>a.ano!==b.ano?a.ano-b.ano:a.mes-b.mes);
+    showToast('Registro atualizado!');
+  } else {
+    dados.push({ano,mes,v});
+    dados.sort((a,b)=>a.ano!==b.ano?a.ano-b.ano:a.mes-b.mes);
+    showToast('Registro adicionado!');
+  }
+  salvarLocal(); fecharModal(); initFiltros(); aplicarFiltro();
+}
+
+// Encaminha a edição para o modal já preenchido.
+function editarRegistro(idx) { abrirModal(idx); }
+
+// Remove um registro depois de confirmação do usuário.
+function excluirRegistro(idx) {
+  if(!dados[idx]) { showToast('Registro não encontrado.','#e02020','#fff'); return; }
+  if(!confirm(`Excluir ${MESES[dados[idx].mes]}/${dados[idx].ano}?`)) return;
+  dados.splice(idx,1);
+  salvarLocal(); initFiltros(); aplicarFiltro();
+  showToast('Registro excluído.','#e02020','#fff');
+}
+
+// Persiste os registros no navegador para manter alterações após recarregar a página.
+function salvarLocal() { localStorage.setItem(STORAGE_KEY,JSON.stringify(dados)); }
+
+// Abre a janela de seleção de arquivo para importar Excel ou CSV.
+function abrirImportacao() {
+  const input = document.getElementById('import-excel');
+  input.value = '';
+  input.click();
+}
+
+// Normaliza o nome das colunas para aceitar variações como "Mês", "Mes" e "mês".
+function normalizarChave(chave) {
+  return String(chave)
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]/g,'');
+}
+
+// Converte mês escrito por extenso ou em número para o padrão interno 1-12.
+function normalizarMes(valor) {
+  if(typeof valor === 'number') return valor;
+  const texto = String(valor || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const meses = {
+    janeiro:1, jan:1, fevereiro:2, fev:2, marco:3, mar:3, abril:4, abr:4,
+    maio:5, mai:5, junho:6, jun:6, julho:7, jul:7, agosto:8, ago:8,
+    setembro:9, set:9, outubro:10, out:10, novembro:11, nov:11, dezembro:12, dez:12
+  };
+  return meses[texto] || Number(texto);
+}
+
+// Retorna o primeiro valor preenchido entre várias possíveis colunas da planilha.
+function obterValor(registro, chaves) {
+  for(const chave of chaves) {
+    if(registro[chave] !== undefined && registro[chave] !== null && registro[chave] !== '') return registro[chave];
+  }
+  return '';
+}
+
+// Converte números vindos da planilha, inclusive textos com vírgula decimal.
+function normalizarNumero(valor) {
+  if(typeof valor === 'number') return valor;
+  return Number(String(valor || '').trim().replace(/\./g,'').replace(',','.'));
+}
+
+// Importa a primeira aba da planilha. A planilha precisa ter colunas de ano, mês e plantas/valor.
+function importarExcel(event) {
+  const arquivo = event.target.files[0];
+  if(!arquivo) return;
+  if(typeof XLSX === 'undefined') {
+    showToast('Biblioteca de Excel não carregou. Verifique a conexão.','#e02020','#fff');
+    return;
+  }
+
+  const leitor = new FileReader();
+  leitor.onload = e => {
+    try {
+      const workbook = XLSX.read(new Uint8Array(e.target.result), { type:'array' });
+      const primeiraAba = workbook.SheetNames[0];
+      const planilha = workbook.Sheets[primeiraAba];
+      const linhas = XLSX.utils.sheet_to_json(planilha, { defval:'' });
+
+      const novosDados = linhas.map(linha => {
+        const registro = {};
+        Object.entries(linha).forEach(([chave, valor]) => {
+          registro[normalizarChave(chave)] = valor;
+        });
+
+        const ano = normalizarNumero(obterValor(registro, ['ano']));
+        const mes = normalizarMes(obterValor(registro, ['mes','mesreferencia','mesano']));
+        const v = normalizarNumero(obterValor(registro, [
+          'plantas','plantaseliminadas','ndeplantaseliminadas','numerodeplantaseliminadas','valor','total','v'
+        ]));
+
+        return { ano, mes, v };
+      }).filter(d =>
+        Number.isInteger(d.ano) &&
+        d.ano >= 1900 &&
+        d.ano <= 2100 &&
+        Number.isInteger(d.mes) &&
+        d.mes >= 1 &&
+        d.mes <= 12 &&
+        Number.isInteger(d.v) &&
+        d.v >= 0
+      );
+
+      if(!novosDados.length) {
+        showToast('A planilha não possui dados válidos. Use colunas Ano, Mês e Plantas.','#e02020','#fff');
+        return;
+      }
+
+      const porPeriodo = new Map();
+      novosDados.forEach(d => porPeriodo.set(`${d.ano}-${d.mes}`, d));
+      dados = [...porPeriodo.values()].sort((a,b)=>a.ano!==b.ano?a.ano-b.ano:a.mes-b.mes);
+
+      salvarLocal();
+      initFiltros();
+      filtrado = [...dados];
+      renderTudo();
+      showToast(`${dados.length} registros importados com sucesso!`);
+    } catch(error) {
+      showToast('Não foi possível ler a planilha.','#e02020','#fff');
+    }
+  };
+  leitor.onerror = () => showToast('Erro ao abrir o arquivo.','#e02020','#fff');
+  leitor.readAsArrayBuffer(arquivo);
+}
+
+// Gera um arquivo CSV com os registros filtrados atualmente.
+function exportarCSV() {
+  if(!filtrado.length) { showToast('Não há registros para exportar.','#c8a84b','#111'); return; }
+  let csv='Ano,Mes,Plantas\n';
+  filtrado.forEach(d=>{ csv+=`${d.ano},${MESES[d.mes]},${d.v}\n`; });
+  const a=document.createElement('a');
+  const url = URL.createObjectURL(new Blob(['\ufeff', csv],{type:'text/csv;charset=utf-8'}));
+  a.href=url;
+  a.download='eliminacao_plantas_raio.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('CSV exportado!');
+}
+
+// Mostra uma mensagem temporária no canto inferior direito.
+function showToast(msg, bg='#222', color='#fff') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = bg;
+  t.style.color = color;
+  t.style.border = `1px solid rgba(255,255,255,0.1)`;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2500);
+}
+
+// Fecha o modal quando o usuário clica fora da caixa.
+document.getElementById('modal-overlay').addEventListener('click', e=>{
+  if(e.target===e.currentTarget) fecharModal();
+});
+// Fecha o modal pela tecla Esc.
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape') fecharModal();
+});
+
+// Inicialização da página: prepara filtros, carrega todos os dados e desenha o dashboard.
+initFiltros(); filtrado=[...dados]; renderTudo();
+</script>
+</body>
+</html>
